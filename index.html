@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VerifAI | Fraud Defense System</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 480px; text-align: center; }
+        h1 { color: #1a73e8; margin: 0 0 8px 0; font-size: 2.2rem; }
+        p { color: #5f6368; margin-bottom: 25px; }
+        .upload-box { border: 3px dashed #1a73e8; border-radius: 12px; padding: 40px; cursor: pointer; background: #f8f9fa; transition: all 0.2s; }
+        .upload-box:hover { background: #e8f0fe; transform: scale(1.02); }
+        .icon { font-size: 48px; margin-bottom: 10px; }
+        #preview { max-width: 100%; border-radius: 8px; margin-top: 20px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button { background: #1a73e8; color: white; border: none; padding: 14px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 20px; }
+        button:hover { background: #1557b0; }
+        button:disabled { background: #dadce0; cursor: not-allowed; }
+        #result { margin-top: 25px; padding: 20px; border-radius: 12px; display: none; text-align: left; }
+        .scam { background: #fce8e6; color: #c5221f; border: 1px solid #f19e9b; }
+        .safe { background: #e6f4ea; color: #137333; border: 1px solid #a8dab5; }
+        .loading { display: none; margin-top: 15px; color: #1a73e8; font-weight: 500; }
+        .debug { font-size: 11px; color: #aaa; margin-top:15px; display: block;}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>VerifAI 🛡️</h1>
+        <p>Autonomous Fraud Defense System</p>
+        
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        
+        <div class="upload-box" id="uploadTrigger">
+            <div class="icon">📷</div>
+            <div style="font-weight: 500; color: #3c4043;">CLICK HERE TO UPLOAD</div>
+            <div style="font-size: 0.9rem; color: #70757a; margin-top: 5px;">Supports WhatsApp & Receipts</div>
+        </div>
+        
+        <img id="preview">
+        
+        <button id="scanBtn" disabled>SCAN NOW</button>
+        <div id="loading" class="loading">⚡ Gemini Lite is analyzing...</div>
+        <div id="debug" class="debug"></div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 👇 YOUR KEY IS EMBEDDED HERE 👇
+        const API_KEY = "AIzaSyD0YPRiLyI8PTJFjGtxTGTZGu77qtQOhjg"; 
+        // ==========================================
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadTrigger = document.getElementById('uploadTrigger');
+        const scanBtn = document.getElementById('scanBtn');
+        const resultDiv = document.getElementById('result');
+        const loading = document.getElementById('loading');
+        const debug = document.getElementById('debug');
+        let fileBase64 = null;
+        let fileType = null;
+
+        uploadTrigger.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileType = file.type;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('preview').src = e.target.result;
+                    document.getElementById('preview').style.display = 'block';
+                    fileBase64 = e.target.result.split(',')[1];
+                    scanBtn.disabled = false;
+                    resultDiv.style.display = 'none';
+                    uploadTrigger.style.display = 'none'; 
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function tryModel(modelName) {
+            debug.innerText = "Attempting: " + modelName + "...";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: "Act as a fraud detection expert. Analyze this image. If it looks like a fake receipt, scam message, or phishing attempt, start response with 'VERDICT: SCAM'. If it looks safe, start with 'VERDICT: SAFE'. Then give 2 short sentences explaining why." },
+                        { inline_data: { mime_type: fileType, data: fileBase64 } }
+                    ]
+                }]
+            };
+
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                console.warn(modelName + " error: " + JSON.stringify(err));
+                return null;
+            }
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        scanBtn.addEventListener('click', async () => {
+            loading.style.display = 'block';
+            scanBtn.disabled = true;
+            resultDiv.style.display = 'none';
+
+            try {
+                // STRATEGY: Try the "Lite" models found in your list.
+                // These usually have open quota when the main ones are full.
+                let text = await tryModel("gemini-2.0-flash-lite-preview-02-05");
+                
+                if (!text) text = await tryModel("gemini-2.0-flash-lite-preview");
+                if (!text) text = await tryModel("gemini-2.5-flash"); // Trying the newest experimental too
+                
+                if (!text) throw new Error("Quota Exceeded on all models. SWITCH VPN TO JAPAN OR NETHERLANDS.");
+
+                loading.style.display = 'none';
+                scanBtn.disabled = false;
+                resultDiv.style.display = 'block';
+                debug.innerText = "";
+
+                if (text.includes("SCAM")) {
+                    resultDiv.className = "scam";
+                    resultDiv.innerHTML = `<strong>🚨 FRAUD DETECTED</strong><br>${text.replace('VERDICT: SCAM', '')}`;
+                } else {
+                    resultDiv.className = "safe";
+                    resultDiv.innerHTML = `<strong>✅ VERIFIED SAFE</strong><br>${text.replace('VERDICT: SAFE', '')}`;
+                }
+
+            } catch (error) {
+                loading.style.display = 'none';
+                scanBtn.disabled = false;
+                alert(error.message);
+            }
+        });
+    </script>
+</body>
+</html>
