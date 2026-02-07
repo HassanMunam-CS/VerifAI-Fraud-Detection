@@ -22,6 +22,7 @@
         .safe { background: #e6f4ea; color: #137333; border: 1px solid #a8dab5; }
         .loading { display: none; margin-top: 15px; color: #1a73e8; font-weight: 500; }
         .debug { font-size: 11px; color: #aaa; margin-top:15px; display: block; font-family: monospace; }
+        .settings-link { font-size: 0.8rem; color: #999; text-decoration: underline; cursor: pointer; margin-top: 10px; display: block;}
     </style>
 </head>
 <body>
@@ -46,21 +47,42 @@
         <div id="debug" class="debug"></div>
         
         <div id="result"></div>
+        <div class="settings-link" onclick="resetKey()">⚙️ Reset API Key</div>
     </div>
 
     <script>
         // ==========================================
-        // 👇 YOUR NEW KEY IS EMBEDDED HERE 👇
-        const API_KEY = "AIzaSyD99WxEnHgP--WXw2LZ8ddsy1Q08FECycA"; 
+        // 🔒 SECURITY: DYNAMIC KEY MANAGEMENT
         // ==========================================
+        // Logic: Checks if user has a key saved. If not, asks for one.
+        let API_KEY = localStorage.getItem("verifai_api_key");
 
-        // 🚀 MODEL PRIORITY LIST (Hackathon Requirement)
-        // 1. Try Gemini 3.0 first (To win the prize)
-        // 2. Try Gemini 2.0 Lite next (For speed & safety)
-       // 🚀 UPDATED MODEL LIST (Correct IDs for Hackathon)
+        function checkApiKey() {
+            if (!API_KEY) {
+                const userKey = prompt("🔐 SECURITY CHECK (Judge Mode):\nPlease enter your Google Gemini API Key to test VerifAI:");
+                if (userKey) {
+                    API_KEY = userKey;
+                    localStorage.setItem("verifai_api_key", userKey);
+                    return true;
+                } else {
+                    alert("⚠️ No API Key provided. The app cannot function without a key.");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function resetKey() {
+            localStorage.removeItem("verifai_api_key");
+            API_KEY = null;
+            alert("API Key cleared. Reloading...");
+            location.reload();
+        }
+
+        // 🚀 MODEL PRIORITY LIST (Gemini 3.0 First)
         const validModels = [
-            "gemini-3-pro-preview",           // ✅ CORRECT ID (No ".0")
-            "gemini-3-flash-preview",         // ✅ CORRECT ID (No ".0")
+            "gemini-3-pro-preview",           
+            "gemini-3-flash-preview",         
             "gemini-2.0-flash-lite-preview-02-05", 
             "gemini-1.5-pro",                 
             "gemini-1.5-flash"                
@@ -114,7 +136,7 @@
                     body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) return null; // Logic: If error, return null to trigger next model
+                if (!response.ok) return null; 
                 
                 const data = await response.json();
                 return data.candidates[0].content.parts[0].text;
@@ -124,6 +146,9 @@
         }
 
         scanBtn.addEventListener('click', async () => {
+            // Check for key before scanning
+            if (!checkApiKey()) return;
+
             loading.style.display = 'block';
             scanBtn.disabled = true;
             resultDiv.style.display = 'none';
@@ -136,7 +161,7 @@
                 finalText = await tryModel(model);
                 if (finalText) {
                     debug.innerText += " ✅ Connected!";
-                    break; // Stop loop if we got a result
+                    break; 
                 }
             }
 
@@ -145,8 +170,8 @@
             resultDiv.style.display = 'block';
 
             if (!finalText) {
-                resultDiv.className = "scam"; // Fallback error style
-                resultDiv.innerHTML = "<strong>⚠️ Connection Error</strong><br>All AI models are currently busy. Please check your internet or try again in 1 minute.";
+                resultDiv.className = "scam"; 
+                resultDiv.innerHTML = "<strong>⚠️ Connection Error</strong><br>Invalid API Key or Network Issue.<br><br> <span style='text-decoration:underline; cursor:pointer' onclick='resetKey()'>Click here to reset Key</span>";
                 return;
             }
 
