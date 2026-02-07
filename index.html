@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VerifAI | Fraud Defense System</title>
+    <title>VerifAI | Global Fraud Defense</title>
     <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .container { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 480px; text-align: center; }
         h1 { color: #1a73e8; margin: 0 0 8px 0; font-size: 2.2rem; }
         p { color: #5f6368; margin-bottom: 25px; }
+        .badge { background: #e8f0fe; color: #1a73e8; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 15px; }
         .upload-box { border: 3px dashed #1a73e8; border-radius: 12px; padding: 40px; cursor: pointer; background: #f8f9fa; transition: all 0.2s; }
         .upload-box:hover { background: #e8f0fe; transform: scale(1.02); }
         .icon { font-size: 48px; margin-bottom: 10px; }
@@ -20,27 +21,28 @@
         .scam { background: #fce8e6; color: #c5221f; border: 1px solid #f19e9b; }
         .safe { background: #e6f4ea; color: #137333; border: 1px solid #a8dab5; }
         .loading { display: none; margin-top: 15px; color: #1a73e8; font-weight: 500; }
-        .debug { font-size: 11px; color: #aaa; margin-top:15px; display: block;}
+        .debug { font-size: 11px; color: #aaa; margin-top:15px; display: block; font-family: monospace; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>VerifAI 🛡️</h1>
-        <p>Autonomous Fraud Defense System</p>
+        <div class="badge">Powered by Gemini 3.0 & 2.0</div>
+        <p>Global Fraud Defense System</p>
         
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
         
         <div class="upload-box" id="uploadTrigger">
             <div class="icon">📷</div>
-            <div style="font-weight: 500; color: #3c4043;">CLICK HERE TO UPLOAD</div>
-            <div style="font-size: 0.9rem; color: #70757a; margin-top: 5px;">Supports WhatsApp & Receipts</div>
+            <div style="font-weight: 500; color: #3c4043;">CLICK TO UPLOAD</div>
+            <div style="font-size: 0.9rem; color: #70757a; margin-top: 5px;">Scan for Fraud / Scams</div>
         </div>
         
         <img id="preview">
         
         <button id="scanBtn" disabled>SCAN NOW</button>
-        <div id="loading" class="loading">⚡ Gemini Lite is analyzing...</div>
+        <div id="loading" class="loading">⚡ AI is analyzing artifacts...</div>
         <div id="debug" class="debug"></div>
         
         <div id="result"></div>
@@ -48,9 +50,21 @@
 
     <script>
         // ==========================================
-        // 👇 YOUR KEY IS EMBEDDED HERE 👇
-        const API_KEY = "AIzaSyD0YPRiLyI8PTJFjGtxTGTZGu77qtQOhjg"; 
+        // 👇 YOUR NEW KEY IS EMBEDDED HERE 👇
+        const API_KEY = "AIzaSyD99WxEnHgP--WXw2LZ8ddsy1Q08FECycA"; 
         // ==========================================
+
+        // 🚀 MODEL PRIORITY LIST (Hackathon Requirement)
+        // 1. Try Gemini 3.0 first (To win the prize)
+        // 2. Try Gemini 2.0 Lite next (For speed & safety)
+       // 🚀 UPDATED MODEL LIST (Correct IDs for Hackathon)
+        const validModels = [
+            "gemini-3-pro-preview",           // ✅ CORRECT ID (No ".0")
+            "gemini-3-flash-preview",         // ✅ CORRECT ID (No ".0")
+            "gemini-2.0-flash-lite-preview-02-05", 
+            "gemini-1.5-pro",                 
+            "gemini-1.5-flash"                
+        ];
 
         const fileInput = document.getElementById('fileInput');
         const uploadTrigger = document.getElementById('uploadTrigger');
@@ -81,65 +95,67 @@
         });
 
         async function tryModel(modelName) {
-            debug.innerText = "Attempting: " + modelName + "...";
+            debug.innerText = "Attempting model: " + modelName + "...";
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
             
             const payload = {
                 contents: [{
                     parts: [
-                        { text: "Act as a fraud detection expert. Analyze this image. If it looks like a fake receipt, scam message, or phishing attempt, start response with 'VERDICT: SCAM'. If it looks safe, start with 'VERDICT: SAFE'. Then give 2 short sentences explaining why." },
+                        { text: "Act as a cybersecurity expert. Analyze this image. If it is a fake receipt, scam message, or phishing attempt, start with 'VERDICT: SCAM'. If it is safe/legit, start with 'VERDICT: SAFE'. Then provide 2 short bullet points explaining why." },
                         { inline_data: { mime_type: fileType, data: fileBase64 } }
                     ]
                 }]
             };
 
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
 
-            if (!response.ok) {
-                const err = await response.json();
-                console.warn(modelName + " error: " + JSON.stringify(err));
+                if (!response.ok) return null; // Logic: If error, return null to trigger next model
+                
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (e) {
                 return null;
             }
-            const data = await response.json();
-            return data.candidates[0].content.parts[0].text;
         }
 
         scanBtn.addEventListener('click', async () => {
             loading.style.display = 'block';
             scanBtn.disabled = true;
             resultDiv.style.display = 'none';
+            debug.style.color = "#aaa";
 
-            try {
-                // STRATEGY: Try the "Lite" models found in your list.
-                // These usually have open quota when the main ones are full.
-                let text = await tryModel("gemini-2.0-flash-lite-preview-02-05");
-                
-                if (!text) text = await tryModel("gemini-2.0-flash-lite-preview");
-                if (!text) text = await tryModel("gemini-2.5-flash"); // Trying the newest experimental too
-                
-                if (!text) throw new Error("Quota Exceeded on all models. SWITCH VPN TO JAPAN OR NETHERLANDS.");
+            let finalText = null;
 
-                loading.style.display = 'none';
-                scanBtn.disabled = false;
-                resultDiv.style.display = 'block';
-                debug.innerText = "";
-
-                if (text.includes("SCAM")) {
-                    resultDiv.className = "scam";
-                    resultDiv.innerHTML = `<strong>🚨 FRAUD DETECTED</strong><br>${text.replace('VERDICT: SCAM', '')}`;
-                } else {
-                    resultDiv.className = "safe";
-                    resultDiv.innerHTML = `<strong>✅ VERIFIED SAFE</strong><br>${text.replace('VERDICT: SAFE', '')}`;
+            // 🔄 MODEL HUNTER LOOP
+            for (const model of validModels) {
+                finalText = await tryModel(model);
+                if (finalText) {
+                    debug.innerText += " ✅ Connected!";
+                    break; // Stop loop if we got a result
                 }
+            }
 
-            } catch (error) {
-                loading.style.display = 'none';
-                scanBtn.disabled = false;
-                alert(error.message);
+            loading.style.display = 'none';
+            scanBtn.disabled = false;
+            resultDiv.style.display = 'block';
+
+            if (!finalText) {
+                resultDiv.className = "scam"; // Fallback error style
+                resultDiv.innerHTML = "<strong>⚠️ Connection Error</strong><br>All AI models are currently busy. Please check your internet or try again in 1 minute.";
+                return;
+            }
+
+            if (finalText.includes("SCAM")) {
+                resultDiv.className = "scam";
+                resultDiv.innerHTML = `<strong>🚨 FRAUD DETECTED</strong><br>${finalText.replace('VERDICT: SCAM', '')}`;
+            } else {
+                resultDiv.className = "safe";
+                resultDiv.innerHTML = `<strong>✅ VERIFIED SAFE</strong><br>${finalText.replace('VERDICT: SAFE', '')}`;
             }
         });
     </script>
